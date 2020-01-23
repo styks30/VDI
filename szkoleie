@@ -1,0 +1,244 @@
+pipeline {
+    agent any
+    stages {
+        stage('1') {
+            steps {
+                sh 'exit 0'
+            }
+        }
+        stage('2') {
+            steps {
+                script {
+                    try {
+                        sh 'exit 1'
+                    }
+                    catch (Exception e) {
+                        println "exception ${e}"
+                    }
+                    finally {
+                        sh 'exit 0'
+                        currentBuild.result = 'UNSTABLE'
+                        echo "RESULT: ${currentBuild.result}"
+                    }
+                }
+                echo "RESULT: ${currentBuild.result}" 
+                }
+        }
+        stage('3') {
+            steps {
+                sh 'exit 0'
+            }
+        }
+    }
+}
+
+
+echo "RESULT: ${currentBuild.result}"
+def git_url = "git@gitlab.jenkins-training.eu:projekty/skrypty-test.git"
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'gitlab', url: git_url]]])
+            }
+        }
+
+        stage("Read json") {
+            steps {
+                script {
+                    def props = readJSON file: '/var/lib/jenkins/workspace/test-read-file/example.json'
+                    println props
+                    println props['quiz']['sport']['q1']['options']
+                }
+                
+
+            }
+        }
+    }
+}
+### Description ###
+
+1. Stworz pipeline z użyciem projektu http://gitlab.jenkins-training.eu/trening/jenkins-trening.git
+1. Stworz pipeline składający się z 5 stage'y ( w tym 3 równoległe). 
+
+2. Jako agenta użyj 'slave01-ubuntu'
+2. Jeden z stage'y STAGE-B będzie posiadał 3 równoległe stage, z których jeden zwraca status "FAILED". 
+
+3. Dodaj parametr, który będzie odpowiadał za ustawianie nazwy brancha
+3. Wejście do stage'a z 3 równoległymi stage'ami powinno wymagać potwierdzenia przez użytkownika w widoku Pipelien'u. 
+   Potwierdzenie może być wykonywane tylko przez użytkownika, który stworzył pipeline (własna nazwa użytkownika)*. 
+*HINT: Snippet Generator
+
+4. Utwórz dwa stage: "Deploy to dev" oraz "Deploy to prod"
+4. Nie allokuj agenta dla stage'a ze Stepem "input"
+
+5. Stage deploy to DEV powinien być uruchamiany tylko dla brancha "develop", natomiast deploy to prod tylko dla brancha "master"
+
+6. W opdowiednich stage'ach uruchom skrypt znajdujący się w repozytorium i przekaż do niego parametr który będzie nazwą brancha -> np. ./deliver-dev.sh 
+"twoj_branch"
+
+7. W skecji "post" jako ostatni krok usuń zawartość workspace 
+
+Wizualizacja: 
+
+STAGE A (input) -> STAGE-B -> STAGE-C (failed) -> STAGE-F
+                              STAGE-D
+                              STAGE-E
+### Description ###
+
+1. Stworz pipeline z użyciem skryptów znajdującyh się w projekcie http://gitlab.jenkins-training.eu:projekty/projekt-cwiczenie1.git (credentialsId: 'gitlab' dla checkoutu)
+
+2. Jako agenta użyj 'slave01-ubuntu' lub 'slave01-windows'
+
+3. Dodaj parametr, który będzie odpowiadał za ustawianie nazwy brancha
+
+4. Utwórz dwa stage: "Deploy to dev" oraz "Deploy to prod"
+
+5. Stage deploy to DEV powinien być uruchamiany tylko dla brancha "develop", natomiast deploy to prod tylko dla brancha "master"
+
+6. W opdowiednich stage'ach uruchom skrypt znajdujący się w repozytorium i przekaż do niego parametr który będzie nazwą brancha -> np. ./deliver-dev.sh 
+"twoj_branch"
+
+7. W skecji "post" jako ostatni krok usuń zawartość workspace 
+### Description ###
+
+1. Utwórz własny projekt w repozytorium ( gitlab.jenkins-training.eu) który będzie zawierał Twoją bibliotekę "Shared library"
+
+2. Utwórz dowolny skrypt bash lub powershell w repozytorium http://gitlab.jenkins-training.eu/projekty/skrypty-zadanie-3.git, który wywołasz w kolejnych krokach. (możesz też utworzyć własny projekt)
+
+2. W katalogu vars biblioteki utwórz 3 zmienne zawierające funkcje domyślnym wywołaniem ( def call() )
+
+3. Pierwsza zmienna będzie tworzyła plik o nazwie podanej przez parametr przy wywołaniu
+
+4. Druga zmienna będzie uruchamiała skrypt o nazwie podanej przez parametr przy wywołaniu
+
+5. Trzecia zmienna będzie obsługiwała checkout do podanego przez parametr repozytorium oraz brancha
+
+6. Utwórz pipeline z użyciem własnej biblioteki. Zrób checkout projektu http://gitlab.jenkins-training.eu/projekty/skrypty-zadanie-3.git za pomocą własnej zmiennej z punktu 5
+
+7. Utwórz plik w workspace Twojego pipeline'u z użyciem zmiennej, którą stowrzyłeś w punkcie 3
+
+8. Wywołaj skrypt z punktu 2 używając funkcji z punktu 5.
+
+// Declarative //
+def git_url = "git@gitlab.jenkins-training.eu:projekty/projekt-cwiczenie1.git"
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+    }
+    parameters {
+        string(name: 'branch', defaultValue: 'master', description: 'branch to checkout')
+    }
+    agent none
+	options {
+		timestamps()
+	}
+    stages {
+        stage('Checkout') {
+        stage('STAGE-A') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: params.branch ]], userRemoteConfigs: [[credentialsId: 'gitlab', url: git_url]]])
+                input message: 'Proceed?', submitter: 'admin'
+            }
+        }
+        stage('Deploy to dev') { 
+            when {
+                expression {
+                    return params.branch ==~ /develop/
+		stage ('STAGE-B') {
+            parallel {
+                stage('STAGE-C') {
+                    agent any
+                    steps {
+                        echo "I'm in STAGE-C"
+                        sleep 10
+                    }
+                }
+            }
+            steps {
+                sh "./deliver-dev.sh ${params.branch}"
+            }
+        }
+        stage('Deploy to prod') {
+            when {
+                expression {
+                    return params.branch ==~ /master/
+                stage('STAGE-D') {
+                    agent any
+                    steps {
+                        echo "I'm in STAGE-C"
+                        sleep 10
+                        sh 'exit 1'
+
+                    }
+                }
+                stage ('STAGE-E') {
+                    agent any
+                    steps {
+                        echo "I'm in STAGE-D"
+                        sleep 10
+                    }
+                }
+            }
+            steps {
+                sh "./deliver-prod.sh ${params.branch}"
+            }
+        }
+    }
+        post {
+            always {
+                cleanWs()
+            }
+        }
+}
+
+
+}
+// Script //
+// Declarative //
+def git_url = "git@gitlab.jenkins-training.eu:projekty/projekt-cwiczenie1.git"
+
+pipeline {
+    agent any
+    options {
+        timestamps()
+    }
+    parameters {
+        string(name: 'branch', defaultValue: 'master', description: 'branch to checkout')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: params.branch ]], userRemoteConfigs: [[credentialsId: 'gitlab', url: git_url]]])
+            }
+        }
+        stage('Deploy to dev') { 
+            when {
+                expression {
+                    return params.branch ==~ /develop/
+                }
+            }
+            steps {
+                sh "./deliver-dev.sh ${params.branch}"
+            }
+        }
+        stage('Deploy to prod') {
+            when {
+                expression {
+                    return params.branch ==~ /master/
+                }
+            }
+            steps {
+                sh "./deliver-prod.sh ${params.branch}"
+            }
+        }
+    }
+        post {
+            always {
+                cleanWs()
+            }
+        }
+}
